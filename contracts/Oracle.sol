@@ -7,6 +7,7 @@ import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 library VRFVerifier {
     using ECDSA for bytes32;
 
+    
     function verifyECVRFProof(
         bytes memory publicKey,
         bytes32 seed,
@@ -38,33 +39,52 @@ library VRFVerifier {
         return true;
     }
 
+    /**
+        * @dev Slices a portion of a bytes array.
+        * @param data The bytes array to slice.
+        * @param start The starting index of the slice.
+        * @param length The length of the slice.
+        * @return The slice of the bytes array.
+     */
     function slice(
         bytes memory data,
         uint256 start,
         uint256 length
     ) internal pure returns (bytes memory) {
+        // Ensure the slice is within bounds
         require(data.length >= start + length, "Invalid slice length");
+        // Create a new "slice" with its own length
         bytes memory tempBytes;
-
+        // Copy over the data
         assembly {
+            // Allocate a new memory slot for the data
             tempBytes := mload(0x40)
+            // Update the free memory pointer
             let lengthMod := and(length, 31)
+            // Write the length of the slice
             let mc := add(tempBytes, lengthMod)
+            // Write the length of the slice
             let end := add(mc, length)
-
+            // Write the length of the slice
             for {
+                // Initialize a copy pointer
                 let cc := add(add(data, lengthMod), start)
+            // Repeat as long as the copy pointer is less than the end pointer
             } lt(mc, end) {
+            // Move the copy pointer 32 bytes forward
                 mc := add(mc, 32)
+            // Move the data pointer 32 bytes forward
                 cc := add(cc, 32)
             } {
+                // Copy 32 bytes of data from the data pointer to the memory pointer
                 mstore(mc, mload(cc))
             }
-
+            // Update the free memory pointer
             mstore(tempBytes, length)
+            // Update the free memory pointer
             mstore(0x40, and(add(mc, 31), not(31)))
         }
-
+        // Return the slice
         return tempBytes;
     }
 
@@ -143,6 +163,11 @@ contract VRFOracleWithCallback {
     ) external {
         RandomnessRequest storage req = requests[requestId];
         require(!req.fulfilled, "Already fulfilled");
+        // The oracle can only fulfill the request if the deadline has not passed
+        require(block.timestamp <= req.deadline, "Request expired");
+        // The oracle can only fulfill the request if the priority is high enough
+        require(req.priority >= 1, "Priority too low");
+        // The oracle can only fulfill the request if the proof is valid
         require(req.requester != address(0), "Invalid requestId");
         require(outputs.length == req.words, "Incorrect number of outputs");
 
