@@ -111,6 +111,7 @@ contract VRFOracleWithCallback {
     }
 
     uint256 private requestCounter;
+    mapping(uint256 => uint256) public requestIndex;
     mapping(uint256 => RandomnessRequest) public requests;
 
     event RandomnessRequested(
@@ -121,6 +122,7 @@ contract VRFOracleWithCallback {
         uint256 deadline,
         uint8 priority
     );
+    uint256[] public pendingRequests;
     event RandomnessFulfilled(uint256 indexed requestId, bytes32[] outputs);
 
     constructor(bytes memory _vrfPublicKey) {
@@ -154,6 +156,8 @@ contract VRFOracleWithCallback {
             deadline,
             priority
         );
+        pendingRequests.push(requestId);
+        requestIndex[requestId] = pendingRequests.length - 1;
     }
 
     function fulfillRandomness(
@@ -185,6 +189,11 @@ contract VRFOracleWithCallback {
 
         IVRFConsumer consumer = IVRFConsumer(req.requester);
         consumer.fulfillRandomness(requestId, outputs);
+        // remove fulfilled request from pendingRequests
+        uint256 index = requestIndex[requestId];
+        uint256 lastIndex = pendingRequests.length - 1;
+        uint256 lastRequestId = pendingRequests[lastIndex];
+        pendingRequests[index] = lastRequestId;
     }
 
     function verifyVRFProof(
